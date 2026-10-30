@@ -6,5 +6,6 @@ COPY . .
 RUN npm test && npm run build
 
 FROM nginx:1.30-alpine
-COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
+RUN rm /etc/nginx/conf.d/default.conf
+COPY deploy/nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /src/dist/index.html /usr/share/nginx/html/index.html
