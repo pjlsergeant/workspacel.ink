@@ -1,0 +1,16 @@
+{
+  "name": "workspacel.ink",
+  "version": "1.0.0",
+  "description": "Rewrite the workspace on a Slack link to your own, then redirect. Not associated with Slack.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "repository": "github:pjlsergeant/workspacel.ink",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "build": "node build.mjs"
+  }
+}

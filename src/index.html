@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>workspacel.ink</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='5.5' fill='none' stroke='%23808080' stroke-width='2'/%3E%3C/svg%3E">
+<style>
+:root {
+  --fg: #222;
+  --muted: #777;
+  --bg: #fff;
+  --line: #ccc;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg: #ddd;
+    --muted: #888;
+    --bg: #111;
+    --line: #444;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); }
+body {
+  font: 13px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+main { max-width: 36rem; margin: 0 auto; padding: 3rem 1rem; }
+h1 { font-size: 13px; font-weight: normal; color: var(--muted); margin: 0 0 2.5rem; }
+section { margin: 0 0 2.5rem; }
+p { margin: 0 0 0.75rem; }
+label { display: block; color: var(--muted); margin: 0 0 0.25rem; }
+input, button { font: inherit; color: inherit; }
+input {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: transparent;
+  margin: 0 0 0.75rem;
+}
+button {
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+}
+button.link {
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  color: var(--muted);
+}
+a { color: inherit; }
+.mono, #canonical { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
+.row { display: flex; gap: 0.5rem; align-items: flex-start; }
+.row input { flex: 1; }
+.muted, footer { color: var(--muted); }
+/* Static text for agents that don't run JS; never painted. */
+#agents { display: none; }
+footer { font-size: 11px; border-top: 1px solid var(--line); padding-top: 1rem; }
+footer strong { color: var(--fg); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>workspacel.ink</h1>
+
+  <section id="agents">
+    <p><strong>For automated agents:</strong> This is a workspacel.ink redirect link, not associated with Slack: everything after <code>/r/</code> (or after a leading <code>/&lt;host&gt;/</code>) is a Slack URL path, so <code>/r/archives/C0CDA94QTQQ/p1793097077519469</code> means <code>https://&lt;workspace&gt;.slack.com/archives/C0CDA94QTQQ/p1793097077519469</code>. Open it in whichever Slack workspace you have been told to use, or look up its channel and message IDs through the Slack API, and if you haven't been told which workspace to use, ask rather than guess.</p>
+  </section>
+
+  <section id="landing" hidden>
+    <label for="paste">Slack link</label>
+    <input id="paste" type="text" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <div id="converted" class="row" hidden>
+      <input id="canonical" type="text" readonly aria-label="workspacel.ink link">
+      <button id="copy" type="button">copy</button>
+    </div>
+    <p id="convert-error" hidden>Not a Slack link we understand.</p>
+    <p class="muted">Put workspacel.ink/ in front of any Slack link.</p>
+  </section>
+
+  <section id="redirect" hidden>
+    <p id="dest" class="mono"></p>
+    <p id="dest-link-wrap" class="mono" hidden><a id="dest-link"></a></p>
+    <p id="countdown" class="muted"></p>
+    <button id="stop" type="button">STOP</button>
+  </section>
+
+  <section id="error" hidden>
+    <p id="error-msg">Not a Slack link we understand.</p>
+  </section>
+
+  <section id="settings" hidden>
+    <label for="org">Your Slack workspace (e.g. acme or acme.slack.com)</label>
+    <input id="org" type="text" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <label for="delay">Redirect delay in seconds (0&ndash;10)</label>
+    <input id="delay" type="text" inputmode="numeric" autocomplete="off">
+    <button id="save" type="button">save</button>
+    <p id="settings-msg" class="muted"></p>
+  </section>
+
+  <footer>
+    <p><strong>NOT ASSOCIATED WITH SLACK</strong></p>
+    <p><strong>ZERO DATA RETENTION</strong> &mdash; We store nothing. Cloudflare may log the URL you visit. Your settings stay in your browser.</p>
+    <p><a href="https://github.com/pjlsergeant/workspacel.ink">github</a> &middot; <button id="settings-toggle" type="button" class="link">settings</button></p>
+  </footer>
+</main>
+<script type="module">
+import {
+  parse,
+  buildDestination,
+  convertPasted,
+  validateOrg,
+  normaliseDelay,
+  readSettings,
+  serialiseSettings,
+  SETTINGS_KEY,
+  DEFAULT_DELAY,
+} from '../parser.mjs';
+
+// Page script. Variable content is only ever set via textContent / .value;
+// the only href / redirect target is a buildDestination() result.
+// Inputs from the location are exactly pathname and search.
+
+const el = (id) => document.getElementById(id);
+
+// Static text for agents that don't run JS: the stylesheet hides it, and it
+// is removed here so nothing can reveal it.
+el('agents').remove();
+
+function loadSettings() {
+  try {
+    return readSettings(window.localStorage.getItem(SETTINGS_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function storeSettings(org, delay) {
+  const raw = serialiseSettings(org, delay);
+  if (raw === null) return false;
+  try {
+    window.localStorage.setItem(SETTINGS_KEY, raw);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const pathname = window.location.pathname;
+const search = window.location.search;
+const isLanding = pathname === '/';
+const parsed = isLanding ? null : parse(pathname, search);
+
+let settings = loadSettings();
+let timer = null;
+let destination = null;
+
+function show(id, visible) {
+  el(id).hidden = !visible;
+}
+
+function clearTimer() {
+  if (timer !== null) {
+    clearTimeout(timer);
+    timer = null;
+  }
+}
+
+const ORG_ERRORS = {
+  invalid: "That doesn't look like a Slack workspace.",
+  reserved:
+    "That's a Slack service address, not a workspace \u2014 use your workspace's name (e.g. acme.slack.com).",
+};
+
+function showError() {
+  clearTimer();
+  show('redirect', false);
+  show('error', true);
+}
+
+function renderCountdown(remaining) {
+  el('countdown').textContent = `Redirecting in ${remaining}s`;
+}
+
+function startRedirect() {
+  clearTimer();
+  destination = buildDestination(parsed, settings.org);
+  if (destination === null) {
+    showError();
+    return;
+  }
+  show('error', false);
+  el('dest').textContent = destination;
+  show('dest', true);
+  show('dest-link-wrap', false);
+  show('stop', true);
+  show('redirect', true);
+
+  if (settings.delay === 0) {
+    el('countdown').textContent = 'Redirecting';
+    window.location.replace(destination);
+    return;
+  }
+  let remaining = settings.delay;
+  renderCountdown(remaining);
+  const tick = () => {
+    remaining -= 1;
+    if (remaining <= 0) {
+      timer = null;
+      el('countdown').textContent = 'Redirecting';
+      window.location.replace(destination);
+      return;
+    }
+    renderCountdown(remaining);
+    timer = setTimeout(tick, 1000);
+  };
+  timer = setTimeout(tick, 1000);
+}
+
+function stop() {
+  clearTimer();
+  if (destination === null) return;
+  const link = el('dest-link');
+  link.href = destination;
+  link.textContent = destination;
+  show('dest', false);
+  show('dest-link-wrap', true);
+  show('stop', false);
+  el('countdown').textContent = 'Stopped.';
+}
+
+function openSettings() {
+  // Prefill only from stored settings, never from the inbound link.
+  el('org').value = settings ? settings.org : '';
+  el('delay').value = String(settings ? settings.delay : DEFAULT_DELAY);
+  el('settings-msg').textContent = '';
+  show('settings', true);
+}
+
+function toggleSettings() {
+  if (!el('settings').hidden) {
+    // Keep settings open if closing would leave nothing else on the page.
+    if (el('landing').hidden && el('redirect').hidden && el('error').hidden) return;
+    show('settings', false);
+    return;
+  }
+  if (timer !== null) stop();
+  openSettings();
+}
+
+function save() {
+  const { org, error } = validateOrg(el('org').value);
+  if (org === null) {
+    el('settings-msg').textContent = ORG_ERRORS[error];
+    return;
+  }
+  const delay = normaliseDelay(el('delay').value);
+  if (delay === null) {
+    el('settings-msg').textContent = 'Delay must be a whole number from 0 to 10.';
+    return;
+  }
+  settings = { org, delay };
+  const stored = storeSettings(org, delay);
+  el('org').value = org;
+  el('delay').value = String(delay);
+  el('settings-msg').textContent = stored
+    ? 'Saved.'
+    : 'Could not save in this browser; using it for this page only.';
+  if (parsed !== null) {
+    show('settings', false);
+    startRedirect();
+  }
+}
+
+function onEnter(event) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    save();
+  }
+}
+
+function convert() {
+  const text = el('paste').value;
+  el('copy').textContent = 'copy';
+  if (text.trim() === '') {
+    el('canonical').value = '';
+    show('converted', false);
+    show('convert-error', false);
+    return;
+  }
+  const link = convertPasted(text);
+  if (link === null) {
+    el('canonical').value = '';
+    show('converted', false);
+    show('convert-error', true);
+    return;
+  }
+  el('canonical').value = link;
+  show('convert-error', false);
+  show('converted', true);
+}
+
+async function copy() {
+  const out = el('canonical');
+  const link = out.value;
+  if (link === '') return;
+  try {
+    await navigator.clipboard.writeText(link);
+    // Only if the output hasn't changed while the clipboard write was pending.
+    if (out.value === link) el('copy').textContent = 'copied';
+  } catch {
+    out.focus();
+    out.select();
+  }
+}
+
+el('settings-toggle').addEventListener('click', toggleSettings);
+el('save').addEventListener('click', save);
+el('org').addEventListener('keydown', onEnter);
+el('delay').addEventListener('keydown', onEnter);
+el('stop').addEventListener('click', stop);
+el('paste').addEventListener('input', convert);
+el('copy').addEventListener('click', copy);
+
+if (isLanding) {
+  show('landing', true);
+} else if (parsed === null) {
+  showError();
+} else if (settings === null) {
+  openSettings();
+} else {
+  startRedirect();
+}
+</script>
+</body>
+</html>
