@@ -128,6 +128,10 @@ import {
 // the only href / redirect target is a buildDestination() result.
 // Inputs from the location are exactly pathname and search.
 
+// Set by the build from DEFAULT_ORG (already validated). Only pre-fills the
+// settings form; nothing redirects with it until the visitor saves.
+const DEFAULT_ORG = '';
+
 const el = (id) => document.getElementById(id);
 
 // Static text for agents that don't run JS: the stylesheet hides it, and it
@@ -237,8 +241,9 @@ function stop() {
 }
 
 function openSettings() {
-  // Prefill only from stored settings, never from the inbound link.
-  el('org').value = settings ? settings.org : '';
+  // Prefill only from stored settings or the build-time default, never from
+  // the inbound link.
+  el('org').value = settings ? settings.org : DEFAULT_ORG;
   el('delay').value = String(settings ? settings.delay : DEFAULT_DELAY);
   el('settings-msg').textContent = '';
   show('settings', true);

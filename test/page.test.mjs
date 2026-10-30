@@ -157,6 +157,28 @@ test('build refuses unsafe script sources', () => {
   assert.throws(() => buildPage('<p>no script</p>', parserSource));
 });
 
+test('DEFAULT_ORG: unset or empty leaves the build untouched; invalid or reserved throws', () => {
+  const parserSource = readFileSync(join(ROOT, 'parser.mjs'), 'utf8');
+  const template = readFileSync(join(ROOT, 'src', 'index.html'), 'utf8');
+  const plain = buildPage(template, parserSource);
+  assert.equal(plain.html, builtHtml);
+  assert.deepEqual(buildPage(template, parserSource, ''), plain);
+  assert.ok(plain.script.includes("const DEFAULT_ORG = '';\n"));
+
+  for (const input of ['acme', 'acme.slack.com', 'https://acme.slack.com/']) {
+    assert.ok(buildPage(template, parserSource, input).script.includes('const DEFAULT_ORG = "acme";\n'), input);
+  }
+  assert.ok(
+    buildPage(template, parserSource, 'acme.enterprise.slack.com').script.includes(
+      'const DEFAULT_ORG = "acme.enterprise";\n',
+    ),
+  );
+  for (const input of ['https://evil.com', 'acme</script>', '<!--', 'xn--x', '   ']) {
+    assert.throws(() => buildPage(template, parserSource, input), /^Error: DEFAULT_ORG: invalid /, input);
+  }
+  assert.throws(() => buildPage(template, parserSource, 'app.slack.com'), /^Error: DEFAULT_ORG: reserved /);
+});
+
 test('inlined script is a classic script that compiles', () => {
   assert.doesNotThrow(() => new vm.Script(inlineScript(builtHtml)));
 });
@@ -173,6 +195,7 @@ const INITIALLY_HIDDEN = new Set(
 );
 
 function runPage({
+  html = builtHtml,
   pathname,
   search = '',
   stored = null,
@@ -270,7 +293,7 @@ function runPage({
     URL,
     console,
   };
-  vm.runInNewContext(inlineScript(builtHtml), context);
+  vm.runInNewContext(inlineScript(html), context);
   const firstTouched = touched[0];
 
   const tick = () => {
@@ -493,4 +516,37 @@ test('page: org validation messages on save', () => {
     assert.equal(p.el('settings').hidden, false, input);
     assert.equal(p.replaced.length, 0, input);
   }
+});
+
+test('page: DEFAULT_ORG pre-fills settings on a first visit only; never redirects until saved', () => {
+  const parserSource = readFileSync(join(ROOT, 'parser.mjs'), 'utf8');
+  const template = readFileSync(join(ROOT, 'src', 'index.html'), 'utf8');
+  const { html } = buildPage(template, parserSource, 'https://acme.slack.com/');
+
+  const p = runPage({ html, pathname: `/r/archives/${CH}` });
+  assert.equal(p.el('settings').hidden, false);
+  assert.equal(p.el('redirect').hidden, true);
+  assert.equal(p.el('org').value, 'acme');
+  assert.equal(p.el('delay').value, '2');
+  assert.equal(p.store.size, 0);
+  assert.equal(p.tick(), false);
+  assert.equal(p.replaced.length, 0);
+  p.el('save').fire('click');
+  assert.equal(p.store.get(SETTINGS_KEY), SETTINGS('acme', 2));
+  p.tick();
+  p.tick();
+  assert.deepEqual(p.replaced, [`https://acme.slack.com/archives/${CH}`]);
+
+  // Landing: settings stay closed; opening them shows the default.
+  const q = runPage({ html, pathname: '/' });
+  assert.equal(q.el('settings').hidden, true);
+  q.el('settings-toggle').fire('click');
+  assert.equal(q.el('org').value, 'acme');
+  assert.equal(q.store.size, 0);
+
+  // Saved settings win.
+  const r = runPage({ html, pathname: `/r/archives/${CH}`, stored: SETTINGS('mine', 3) });
+  r.el('settings-toggle').fire('click');
+  assert.equal(r.el('org').value, 'mine');
+  assert.equal(r.el('delay').value, '3');
 });

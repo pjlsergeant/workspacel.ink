@@ -1,17 +1,20 @@
 // Build: inline parser.mjs + the page script from src/index.html into a single
 // classic <script>, hash it, and write dist/index.html with the CSP as a
 // <meta http-equiv> pinned to that hash. No dependencies.
+// DEFAULT_ORG=<workspace> pre-fills the settings form (see buildPage).
 
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { validateOrg } from './parser.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 
 const SCRIPT_RE = /<script type="module">\n([\s\S]*?)<\/script>/;
 const IMPORT_RE = /^import \{[^}]*\} from '\.\.\/parser\.mjs';\n/m;
 const CHARSET_META = '<meta charset="utf-8">\n';
+const DEFAULT_ORG_RE = /^const DEFAULT_ORG = '';\n/m;
 
 export function cspContent(hash) {
   // style-src isn't hashed: only a static <style> block, no HTML sinks, default-src 'none'; kept simple.
@@ -29,7 +32,19 @@ function stripExports(source) {
   return out;
 }
 
-export function buildPage(template, parserSource) {
+// Bake a validated default org into the page script. Unset or empty leaves
+// the script untouched.
+function applyDefaultOrg(pageBody, defaultOrg) {
+  if (defaultOrg === undefined || defaultOrg === '') return pageBody;
+  const { org, error } = validateOrg(defaultOrg);
+  if (org === null) throw new Error(`DEFAULT_ORG: ${error} Slack workspace: ${defaultOrg}`);
+  if ((pageBody.match(new RegExp(DEFAULT_ORG_RE, 'gm')) || []).length !== 1) {
+    throw new Error("page script must contain exactly one const DEFAULT_ORG = '';");
+  }
+  return pageBody.replace(DEFAULT_ORG_RE, () => `const DEFAULT_ORG = ${JSON.stringify(org)};\n`);
+}
+
+export function buildPage(template, parserSource, defaultOrg) {
   const count = (re) => (template.match(re) || []).length;
   if (count(/<script/gi) !== 1 || count(/<\/script/gi) !== 1) {
     throw new Error('src/index.html must contain exactly one <script> and one </script>');
@@ -41,7 +56,7 @@ export function buildPage(template, parserSource) {
   if (!m) throw new Error('src/index.html: <script type="module"> block not found');
   const pageSource = m[1];
   if (!IMPORT_RE.test(pageSource)) throw new Error('page script must import from ../parser.mjs');
-  const pageBody = pageSource.replace(IMPORT_RE, '');
+  const pageBody = applyDefaultOrg(pageSource.replace(IMPORT_RE, ''), defaultOrg);
   if (/^\s*(export|import)\b/m.test(pageBody)) {
     throw new Error('page script: unexpected import/export');
   }
@@ -66,16 +81,21 @@ export function buildPage(template, parserSource) {
   return { html, script, hash };
 }
 
-export function build(outDir = join(ROOT, 'dist')) {
+export function build(outDir = join(ROOT, 'dist'), defaultOrg) {
   const template = readFileSync(join(ROOT, 'src', 'index.html'), 'utf8');
   const parserSource = readFileSync(join(ROOT, 'parser.mjs'), 'utf8');
-  const { html, hash } = buildPage(template, parserSource);
+  const { html, hash } = buildPage(template, parserSource, defaultOrg);
   mkdirSync(outDir, { recursive: true });
   writeFileSync(join(outDir, 'index.html'), html);
   return { outDir, hash };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const { outDir, hash } = build();
-  console.log(`built ${outDir}/index.html (script sha256-${hash})`);
+  try {
+    const { outDir, hash } = build(undefined, process.env.DEFAULT_ORG);
+    console.log(`built ${outDir}/index.html (script sha256-${hash})`);
+  } catch (e) {
+    console.error(`build failed: ${e.message}`);
+    process.exitCode = 1;
+  }
 }

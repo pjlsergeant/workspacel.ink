@@ -90,6 +90,11 @@ into one `<script>`, computes its SHA-256 and writes `dist/index.html` with a
 `<meta http-equiv="Content-Security-Policy">` pinned to that hash and a
 `<meta name="referrer" content="no-referrer">`.
 
+Self-hosted copies can set `DEFAULT_ORG=acme npm run build` (any form the
+settings box accepts) to pre-fill the workspace in the settings form.
+Visitors still have to save it before anything redirects; an invalid or
+reserved value fails the build.
+
 ## Hosting requirements
 
 `dist/index.html` is the whole site. However it is hosted:
