@@ -1,6 +1,6 @@
-# workspacel.ink
+# 🔗✨ workspacel.ink 🚀💯
 
-Rewrites the workspace on a Slack link to the one you chose, then redirects.
+Rewrites the workspace on a Slack link to the one you chose, then redirects. 🪄🔀🎯
 
     https://workspacel.ink/r/archives/C0CDA94QTQQ/p1793097077519469
       -> https://<your-workspace>.slack.com/archives/C0CDA94QTQQ/p1793097077519469
@@ -11,10 +11,10 @@ link that doesn't mention the workspace it came from. Whoever opens it is sent
 to the same channel, message, file or profile on *their* workspace (set once,
 under "settings").
 
-**NOT ASSOCIATED WITH SLACK.** This is an independent project. "Slack" is used
+🚫🙅 **NOT ASSOCIATED WITH SLACK.** 🙅🚫 This is an independent project. "Slack" is used
 only to describe which links it understands.
 
-## Data retention
+## 🔒🕵️ Data retention
 
 **ZERO DATA RETENTION** — We store nothing. Cloudflare may log the URL you
 visit. Your settings stay in your browser.
@@ -24,7 +24,7 @@ Your workspace and redirect delay live in your browser's localStorage
 (`workspacel.ink:settings`) and nowhere else. The origin must record nothing
 (see [Hosting requirements](#hosting-requirements)).
 
-## Accepted links
+## ✅🔗 Accepted links
 
 Three input forms:
 
@@ -62,25 +62,25 @@ HTML-to-markdown converters, agents), the page carries a static explanation of
 how to follow the link by hand; the stylesheet hides it and the script removes
 it on load.
 
-## Security model
+## 🛡️🔐 Security model
 
-- The destination host comes only from the visitor's own validated setting;
+- 🏠 The destination host comes only from the visitor's own validated setting;
   the inbound link's workspace is discarded.
-- Only allowlisted link shapes are accepted. Path segments other than the
+- 📋 Only allowlisted link shapes are accepted. Path segments other than the
   discarded filename, and `thread_ts` / `cid`, must match exactly (so no `%`)
   or the link is rejected; unknown query parameters are dropped without
   inspection.
-- Nothing is percent-decoded.
-- The destination is built from parsed fields via `URL` setters, then checked
+- 🙅 Nothing is percent-decoded.
+- 🧱 The destination is built from parsed fields via `URL` setters, then checked
   for an exact match before use.
-- Variable text is only ever set via `textContent` / `.value`; a test bans
+- ✍️ Variable text is only ever set via `textContent` / `.value`; a test bans
   HTML sinks such as `innerHTML`.
-- The page has one inline script, pinned by a CSP hash, and makes no external
+- 📄 The page has one inline script, pinned by a CSP hash, and makes no external
   requests.
 
-## Build and test
+## 🏗️🧪 Build and test
 
-Node 22, no dependencies.
+Node 22, no dependencies. 🎉📦🚫
 
     npm test          # node --test (tests build into a temp directory)
     npm run build     # node build.mjs -> dist/index.html
@@ -90,7 +90,7 @@ into one `<script>`, computes its SHA-256 and writes `dist/index.html` with a
 `<meta http-equiv="Content-Security-Policy">` pinned to that hash and a
 `<meta name="referrer" content="no-referrer">`.
 
-## Hosting requirements
+## ☁️🌍 Hosting requirements
 
 `dist/index.html` is the whole site. However it is hosted:
 
@@ -101,6 +101,6 @@ into one `<script>`, computes its SHA-256 and writes `dist/index.html` with a
 - Send `X-Frame-Options: DENY` and `X-Content-Type-Options: nosniff`. (The
   CSP and referrer policy are already in the page as `<meta>` tags.)
 
-## Licence
+## 📜⚖️ Licence
 
 MIT. See [LICENSE](LICENSE).

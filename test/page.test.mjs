@@ -118,10 +118,11 @@ test('built page makes no external requests and has the required copy', () => {
     'ZERO DATA RETENTION',
     'We store nothing. Cloudflare may log the URL you visit. Your settings stay in your browser.',
     'Not a Slack link we understand.',
+    '😬🙈 Oops!',
     'Put workspacel.ink/ in front of any Slack link.',
     'href="https://github.com/pjlsergeant/workspacel.ink"',
-    '>settings<',
-    '>STOP<',
+    '⚙️ settings 🛠️<',
+    '🛑✋ STOP ✋🛑<',
     'For automated agents:',
     'whichever Slack workspace you have been told to use',
   ]) {
@@ -315,18 +316,18 @@ test('page: landing shows the converter; converts and copies', async () => {
   p.el('copy').fire('click');
   await new Promise((r) => setImmediate(r));
   assert.deepEqual(p.copied, [p.el('canonical').value]);
-  assert.equal(p.el('copy').textContent, 'copied');
+  assert.equal(p.el('copy').textContent, '✅ copied! 🎉🥳');
 
   p.el('paste').value = `acme.slack.com/archives/${CH}`;
   p.el('paste').fire('input');
-  assert.equal(p.el('copy').textContent, 'copy', 'label resets when the output changes');
+  assert.equal(p.el('copy').textContent, '📋 copy', 'label resets when the output changes');
 
   // Input changing while the clipboard write is pending doesn't leave 'copied'.
   p.el('copy').fire('click');
   p.el('paste').value = `acme.slack.com/team/U0123ABCD`;
   p.el('paste').fire('input');
   await new Promise((r) => setImmediate(r));
-  assert.equal(p.el('copy').textContent, 'copy');
+  assert.equal(p.el('copy').textContent, '📋 copy');
 
   p.el('paste').value = 'https://evil.com/archives/' + CH;
   p.el('paste').fire('input');
@@ -478,10 +479,10 @@ test('page: unrecognised link shows the error and never redirects', () => {
 
 test('page: org validation messages on save', () => {
   const cases = [
-    ['https://evil.com', "That doesn't look like a Slack workspace."],
+    ['https://evil.com', "🤨❌ That's not a Slack workspace, bestie! 💅🙃"],
     [
       `https://app.slack.com/client/T0123ABCD/${CH}`,
-      "That's a Slack service address, not a workspace \u2014 use your workspace's name (e.g. acme.slack.com).",
+      "🚨🛑 That's a Slack service address, not a workspace \u2014 use your workspace's name (e.g. acme.slack.com) 🙏😅",
     ],
   ];
   for (const [input, message] of cases) {

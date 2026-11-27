@@ -77,5 +77,5 @@ export function build(outDir = join(ROOT, 'dist')) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const { outDir, hash } = build();
-  console.log(`built ${outDir}/index.html (script sha256-${hash})`);
+  console.log(`✅🎉 built ${outDir}/index.html 📦✨ (script sha256-${hash}) 🔐🚀`);
 }
